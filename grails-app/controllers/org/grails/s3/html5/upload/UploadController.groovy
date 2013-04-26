@@ -88,6 +88,7 @@ class UploadController {
 			
 			def chunks = upload.chunksUploaded.split(',') as Set
 			chunks.add(chunk)
+			chunks.remove("")
 			upload.chunksUploaded = chunks.join(',')
 			upload.save(failOnError: true)
 			
