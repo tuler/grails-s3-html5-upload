@@ -6,7 +6,7 @@
  * License: http://www.gnu.org/copyleft/gpl.html
  */
 
-function upload(input, settings) {
+function upload(file, settings) {
 	console = console || function() {};
 	var KB = 1024;
 	var MB = 1024 * KB;
@@ -28,7 +28,7 @@ function upload(input, settings) {
 	}
 	console.log("OK")
 
-	function Uploader(input, settings) {
+	function Uploader(file, settings) {
 		var u = this;
 		
 		settings = settings || {};
@@ -51,86 +51,84 @@ function upload(input, settings) {
 		settings.max_size = settings.max_size || 5 * (1 << 30); // 5GB
 		u.settings = settings;
 		
-		u.input = input;
+		u.file = file;
 		this.set_state("waiting");
-		
-		u.input.onchange = function(e, force) {
-			if(u.get_state() != "waiting") {
-				return false;
-			}
-			
-			// TODO: support for multiple files?
-			var file = e.target.files[0];
-			u.file = file;
-			u.file.lastModifiedDate = u.file.lastModifiedDate || new Date(0);
-			
-			if(file.size > u.settings.max_size) {
-				alert("The maximum allowed file size is 5GB. Please select another file.");
-				return;
-			}
-			
-			// initialize file upload
-			u.get_init_signature(function(signature, date) {
-				if(!u.upload_id) {
-					var path = "/" + settings.key + "?uploads";
-					var method = "POST";
-					var authorization = "AWS " + settings.access_key + ":" + signature;
-					
-					var xhr = new XMLHttpRequest();
-					var handler = function(e) {
-						u.settings.on_select.call(u, file);
-						// hackish, should be changed
-						u.upload_id = e.target.responseText.match(/<UploadId>([^<]+)/)[1];
-						u.get_all_signatures(function() {
-							u.load_file(file);
-						});
-					};
-					xhr.addEventListener("load", handler, true);
-					xhr.addEventListener("error", handler, true);
-					
-					xhr.open(method, settings.host + path, true);
-					
-					// use date that came from server
-					xhr.setRequestHeader("x-amz-date", date);
-					
-					// TODO: object acl, bring config from server
-//					xhr.setRequestHeader("x-amz-acl", "public-read");
-					
-					// authorization header, encrypted by server
-					xhr.setRequestHeader("Authorization", authorization);
-					
-					// TODO: use file name?
-					xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
-					
-					// go!
-					xhr.send();
-				} else {
-					if(!force) {
-						u.list_parts(function() {
-							// success means succeed
-							u.get_all_signatures(function() {
-								u.load_file(file);
-							});
-						}, function() {
-							u.upload_id = null;
-							this._loaded_chunks = null;
-							u._progress = null;
-							u._loaded_chunks = null;
-							u._uploading_chunks = null;
-							u._chunks = null;
-							return u.input.onchange(e, true); // force reload
-						});
-					} else {
-						u.get_all_signatures(function() {
-							u.load_file(file);
-						});
-					}
-				}
-			}, force);
-		}
 		u.settings.on_init.apply(u);
 	}
-	
+	Uploader.prototype.upload = function(force) {
+		var u = this;
+		if(u.get_state() != "waiting") {
+			return false;
+		}
+		
+		// TODO: support for multiple files?
+		var file = u.file;
+		file.lastModifiedDate = file.lastModifiedDate || new Date(0);
+		
+		if(file.size > u.settings.max_size) {
+			alert("The maximum allowed file size is 5GB. Please select another file.");
+			return;
+		}
+		
+		// initialize file upload
+		u.get_init_signature(function(signature, date) {
+			if(!u.upload_id) {
+				var path = "/" + settings.key + "?uploads";
+				var method = "POST";
+				var authorization = "AWS " + settings.access_key + ":" + signature;
+				
+				var xhr = new XMLHttpRequest();
+				var handler = function(e) {
+					u.settings.on_select.call(u, file);
+					// hackish, should be changed
+					u.upload_id = e.target.responseText.match(/<UploadId>([^<]+)/)[1];
+					u.get_all_signatures(function() {
+						u.load_file(file);
+					});
+				};
+				xhr.addEventListener("load", handler, true);
+				xhr.addEventListener("error", handler, true);
+				
+				xhr.open(method, settings.host + path, true);
+				
+				// use date that came from server
+				xhr.setRequestHeader("x-amz-date", date);
+				
+				// TODO: object acl, bring config from server
+//					xhr.setRequestHeader("x-amz-acl", "public-read");
+				
+				// authorization header, encrypted by server
+				xhr.setRequestHeader("Authorization", authorization);
+				
+				// TODO: use file name?
+				xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
+				
+				// go!
+				xhr.send();
+			} else {
+				if(!force) {
+					u.list_parts(function() {
+						// success means succeed
+						u.get_all_signatures(function() {
+							u.load_file(file);
+						});
+					}, function() {
+						u.upload_id = null;
+						this._loaded_chunks = null;
+						u._progress = null;
+						u._loaded_chunks = null;
+						u._uploading_chunks = null;
+						u._chunks = null;
+						return u.upload(true); // force reload
+					});
+				} else {
+					u.get_all_signatures(function() {
+						u.load_file(file);
+					});
+				}
+			}
+		}, force);
+	}
 	Uploader.prototype.load_file = function(file) {
 		var u = this;
 		if(u.get_state() != "waiting") {
@@ -340,7 +338,7 @@ function upload(input, settings) {
 						
 					} else {
 						u.cancel(function() {
-							u.input.onchange(null, true);
+							u.upload(true);
 						});
 					}
 				}
@@ -761,5 +759,5 @@ function upload(input, settings) {
 	Uploader.prototype.get_upload_id = function() {
 		return this.upload_id;
 	}
-	return new Uploader(input, settings);
+	return new Uploader(file, settings);
 };
