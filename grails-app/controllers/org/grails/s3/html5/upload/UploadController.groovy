@@ -134,6 +134,8 @@ class UploadController {
 		}
 		
 		if (upload) {
+			// upload already initiated, based on [filename, filesize, lastModified]
+			// generate signature for init of uploadId
 			def signature = init(upload.key, date)
 			render JsonOutput.toJson([
 				signature: signature, 
