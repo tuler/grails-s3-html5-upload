@@ -6,7 +6,7 @@
  * License: http://www.gnu.org/copyleft/gpl.html
  */
 
-function mule_upload(file, key, settings) {
+function uploader(file, key, settings) {
     console = console || function() {};
     var KB = 1024;
     var MB = 1024 * KB;
