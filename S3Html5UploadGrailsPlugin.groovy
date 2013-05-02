@@ -9,11 +9,11 @@ class S3Html5UploadGrailsPlugin {
     ]
 
     // TODO Fill in these fields
-    def title = "S3 Html5 Upload Plugin" // Headline display name of the plugin
-    def author = "Your name"
-    def authorEmail = ""
+    def title = "S3 HTML5 Upload Plugin" // Headline display name of the plugin
+    def author = "Danilo Tuler"
+    def authorEmail = "tuler@pobox.com"
     def description = '''\
-Brief summary/description of the plugin.
+This plugin provides resumable file upload from the browser directly to Amazon S3.
 '''
 
     // URL to the plugin's documentation
@@ -22,10 +22,10 @@ Brief summary/description of the plugin.
     // Extra (optional) plugin metadata
 
     // License: one of 'APACHE', 'GPL2', 'GPL3'
-//    def license = "APACHE"
+    def license = "GPL3"
 
     // Details of company behind the plugin (if there is one)
-//    def organization = [ name: "My Company", url: "http://www.my-company.com/" ]
+    def organization = [ name: "Ideais", url: "http://www.ideais.com.br/" ]
 
     // Any additional developers beyond the author specified above.
 //    def developers = [ [ name: "Joe Bloggs", email: "joe@bloggs.net" ]]
@@ -34,7 +34,7 @@ Brief summary/description of the plugin.
 //    def issueManagement = [ system: "JIRA", url: "http://jira.grails.org/browse/GPMYPLUGIN" ]
 
     // Online location of the plugin's browseable source code.
-//    def scm = [ url: "http://svn.codehaus.org/grails-plugins/" ]
+    def scm = [ url: "https://github.com/tuler/grails-s3-html5-upload" ]
 
     def doWithWebDescriptor = { xml ->
         // TODO Implement additions to web.xml (optional), this event occurs before
