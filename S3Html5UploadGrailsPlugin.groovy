@@ -17,7 +17,7 @@ This plugin provides resumable file upload from the browser directly to Amazon S
 '''
 
     // URL to the plugin's documentation
-    def documentation = "http://grails.org/plugin/s3-html5-upload"
+    def documentation = "https://github.com/tuler/grails-s3-html5-upload"
 
     // Extra (optional) plugin metadata
 
