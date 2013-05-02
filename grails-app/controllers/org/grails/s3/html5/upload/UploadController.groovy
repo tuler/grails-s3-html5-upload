@@ -10,9 +10,10 @@ class UploadController {
 
 	def grailsApplication
 	
-	private static String sign(String secret, String data) {
+	private String sign(String data) {
+		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
 		byte[] dataBytes = data.getBytes('UTF-8')
-		byte[] secretBytes = secret.getBytes('UTF-8')
+		byte[] secretBytes = secretKey.getBytes('UTF-8')
 		SecretKeySpec signingKey = new SecretKeySpec(secretBytes, 'HmacSHA1');
 		Mac mac = Mac.getInstance('HmacSHA1');
 		mac.init(signingKey);
@@ -27,36 +28,28 @@ class UploadController {
 	}
 	
 	private String init(String key, String date) {
-		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
-		def acl = "public-read"
 		def bucket = grailsApplication.config.grails.plugin.s3.html5.upload.bucket
-		return sign(secretKey, "POST\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploads")
+		return sign("POST\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploads")
 	}
 	
-	private String chunk(String key, String uploadId, String chunk, String date) {
-		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
-		def mimeType = grailsApplication.config.grails.plugin.s3.html5.upload.mimeType
+	private String chunk(String key, String uploadId, String chunk, String contentType, String date) {
 		def bucket = grailsApplication.config.grails.plugin.s3.html5.upload.bucket
-		return sign(secretKey, "PUT\n\n${mimeType}\n\nx-amz-date:${date}\n/${bucket}/${key}?partNumber=${chunk}&uploadId=${uploadId}")
+		return sign("PUT\n\n${contentType}\n\nx-amz-date:${date}\n/${bucket}/${key}?partNumber=${chunk}&uploadId=${uploadId}")
 	}
 	
 	private String list(String key, String uploadId, String date) {
-		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
 		def bucket = grailsApplication.config.grails.plugin.s3.html5.upload.bucket
-		return sign(secretKey, "GET\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
+		return sign("GET\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
 	}
 	
-	private String end(String key, String uploadId, String date) {
-		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
-		def mimeType = grailsApplication.config.grails.plugin.s3.html5.upload.mimeType
+	private String end(String key, String uploadId, String contentType, String date) {
 		def bucket = grailsApplication.config.grails.plugin.s3.html5.upload.bucket
-		return sign(secretKey, "POST\n\n${mimeType}\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
+		return sign("POST\n\n${contentType}\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
 	}
 	
 	private String delete(String key, String uploadId, String date) {
-		def secretKey = grailsApplication.config.grails.plugin.s3.html5.upload.secretKey ?: grailsApplication.config.grails.plugin.awssdk.secretKey
 		def bucket = grailsApplication.config.grails.plugin.s3.html5.upload.bucket
-		return sign(secretKey, "DELETE\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
+		return sign("DELETE\n\n\n\nx-amz-date:${date}\n/${bucket}/${key}?uploadId=${uploadId}")
 	}
 	
 	def chunk_loaded() {
@@ -99,11 +92,11 @@ class UploadController {
 	def get_all_signatures() {
 		def date = http_date()
 		def list_signature = list(params.key, params.upload_id, date)
-		def end_signature = end(params.key, params.upload_id, date)
+		def end_signature = end(params.key, params.upload_id, params.content_type, date)
 		def delete_signature = delete(params.key, params.upload_id, date)
 		
 		int numChunks = params.int('num_chunks')
-		def chunk_signatures = (1..numChunks).collect { [chunk(params.key, params.upload_id, "${it}", date), date]}
+		def chunk_signatures = (1..numChunks).collectEntries { ["${it}", [chunk(params.key, params.upload_id, "${it}", params.content_type, date), date]]}
 		
 		render JsonOutput.toJson([
 			list_signature: [list_signature, date], 
@@ -152,7 +145,7 @@ class UploadController {
 	
 	def get_chunk_signature() {
 		def date = http_date()
-		def signature = chunk(params.key, params.upload_id, params.chunk, date)
+		def signature = chunk(params.key, params.upload_id, params.chunk, params.content_type, date)
 		render JsonOutput.toJson([signature: signature, date: date])
 	}
 	
@@ -164,7 +157,7 @@ class UploadController {
 	
 	def get_end_signature() {
 		def date = http_date()
-		def signature = end(params.key, params.upload_id, date)
+		def signature = end(params.key, params.upload_id, params.content_type, date)
 		render JsonOutput.toJson([signature: signature, date: date])
 	}
 	

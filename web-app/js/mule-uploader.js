@@ -1,64 +1,3 @@
-
-function upload(file, key, settings) {
-	var host = "http://" + settings.bucket + ".s3.amazonaws.com";
-	settings.chunk_size = settings.chunk_size || (6 * 1024 * 1024);
-	
-	$.getJSON(settings.url + '/get_init_signature', {
-		key: key, 
-		filename: file.name, 
-		filesize: file.size, 
-		last_modified: file.lastModifiedDate.valueOf()
-	})
-	.done(function(data) {
-		var upload_id;
-		if (data.chunks) {
-			// resume upload...
-			upload_id = data.upload_id;
-			key = data.key;
-			data.chunks;
-		} else {
-		}
-		data.signature;
-		data.date;
-		
-		if (!upload_id) {
-			var path = "/" + key + "?uploads";
-			var authorization = "AWS " + settings.access_key + ":" + data.signature;
-			
-			$.ajax({
-				type: 'POST', 
-				url: host + path, 
-				headers: {
-					'x-amz-date': date, 
-					'Authorization': authorization
-					'Content-Disposition': 'attachment; filename=' + file.name
-				}, 
-				dataType: 'xml'
-			})
-			.done(xml) {
-				var upload_id = $(xml).find('UploadId').text();
-				$.getJSON(settings.url + '/get_all_signatures', {
-					key: key, 
-					num_chunks: file.size / settings.chunk_size, 
-					upload_id: upload_id, 
-					filename: file.name, 
-					filesize: file.size, 
-					last_modified: file.lastModifiedDate.valueOf()
-				})
-				.done(data) {
-					data.chunk_signatures;
-					data.list_signature;
-					data.end_signature;
-					data.delete_signature;
-				}
-				.fail(settings.onError);
-			}
-		}
-	})
-	.fail(settings.onError);
-}
-
-
 /**
  * mule-upload.js
  *
@@ -67,7 +6,7 @@ function upload(file, key, settings) {
  * License: http://www.gnu.org/copyleft/gpl.html
  */
 
-function mule_upload(input, settings) {
+function mule_upload(file, key, settings) {
     console = console || function() {};
     var KB = 1024;
     var MB = 1024 * KB;
@@ -88,18 +27,16 @@ function mule_upload(input, settings) {
     }
     console.log("OK")
 
-    function Uploader(input, settings) {
+    function Uploader(file, key, settings) {
         var u = this;
 
         settings = settings || {};
 
         // NOTE: For Amazon S3, the minimum chunk size is 5MB
         settings.chunk_size = settings.chunk_size || (6 * MB); // default 6MB
-        settings.key = settings.key || "the_key";
         settings.bucket = settings.bucket || "akiai-raw";
         settings.host = settings.host || "http://" + settings.bucket + ".s3.amazonaws.com";
         settings.access_key = settings.access_key || "YOUR AWS ACCESS KEY";
-        settings.content_type = settings.content_type || "the_mime_type";
         settings.on_progress = settings.on_progress || function() {};
         settings.on_select = settings.on_select || function() {};
         settings.on_error = settings.on_error || function() {};
@@ -111,77 +48,74 @@ function mule_upload(input, settings) {
         settings.max_size = settings.max_size || 5 * (1 << 30); // 5GB
         u.settings = settings;
 
-        u.input = input;
+        u.file = file;
+        u.key = key;
+        u.file.lastModifiedDate = u.file.lastModifiedDate || new Date(0);
         this.set_state("waiting");
-
-        u.input.onchange = function(e, force) {
-            if(u.get_state() != "waiting") {
-                return false;
-            }
-
-            var file = e.target.files[0];
-            u.file = file;
-            u.file.lastModifiedDate = u.file.lastModifiedDate || new Date(0);
-
-            if(file.size > u.settings.max_size) {
-                alert("The maximum allowed file size is 5GB. Please select another file.");
-                return;
-            }
-
-            // initialize file upload
-            u.get_init_signature(function(signature, date) {
-                if(!u.upload_id) {
-                    var path = "/" + settings.key + "?uploads";
-                    var method = "POST";
-                    var authorization = "AWS " + settings.access_key + ":" + signature;
-
-                    var xhr = new XMLHttpRequest();
-                    var handler = function(e) {
-                        u.settings.on_select.call(u, file);
-                        // hackish, should be changed
-                        u.upload_id = e.target.responseText.match(/<UploadId>([^<]+)/)[1];
-                        u.get_all_signatures(function() {
-                            u.load_file(file);
-                        });
-                    };
-                    xhr.addEventListener("load", handler, true);
-                    xhr.addEventListener("error", handler, true);
-
-                    xhr.open(method, settings.host + path, true);
-
-                    xhr.setRequestHeader("x-amz-date", date);
-                    xhr.setRequestHeader("x-amz-acl", "public-read");
-                    xhr.setRequestHeader("Authorization", authorization);
-                    xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
-                    xhr.send();
-                } else {
-                    if(!force) {
-                        u.list_parts(function() {
-                            // success means succeed
-                            u.get_all_signatures(function() {
-                                console.log("1");
-                                u.load_file(file);
-                            });
-                        }, function() {
-                            u.upload_id = null;
-                            this._loaded_chunks = null;
-                            u._progress = null;
-                            u._loaded_chunks = null;
-                            u._uploading_chunks = null;
-                            u._chunks = null;
-                            return u.input.onchange(e, true); // force reload
-                        });
-                    } else {
-                        u.get_all_signatures(function() {
-                            u.load_file(file);
-                        });
-                    }
-                }
-            }, force);
-        }
         u.settings.on_init.apply(u);
     }
+    Uploader.prototype.upload = function(force) {
+        var u = this;
+        
+        if(u.get_state() != "waiting") {
+            return false;
+        }
 
+        if(file.size > u.settings.max_size) {
+            alert("The maximum allowed file size is 5GB. Please select another file.");
+            return;
+        }
+
+        // initialize file upload
+        u.get_init_signature(function(signature, date) {
+            if(!u.upload_id) {
+                var path = "/" + u.key + "?uploads";
+                var method = "POST";
+                var authorization = "AWS " + settings.access_key + ":" + signature;
+
+                var xhr = new XMLHttpRequest();
+                var handler = function(e) {
+                    u.settings.on_select.call(u, file);
+                    // hackish, should be changed
+                    u.upload_id = e.target.responseText.match(/<UploadId>([^<]+)/)[1];
+                    u.get_all_signatures(function() {
+                        u.load_file(file);
+                    });
+                };
+                xhr.addEventListener("load", handler, true);
+                xhr.addEventListener("error", handler, true);
+
+                xhr.open(method, settings.host + path, true);
+
+                xhr.setRequestHeader("x-amz-date", date);
+                xhr.setRequestHeader("Authorization", authorization);
+                xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
+                xhr.send();
+            } else {
+                if(!force) {
+                    u.list_parts(function() {
+                        // success means succeed
+                        u.get_all_signatures(function() {
+                            console.log("1");
+                            u.load_file(file);
+                        });
+                    }, function() {
+                        u.upload_id = null;
+                        this._loaded_chunks = null;
+                        u._progress = null;
+                        u._loaded_chunks = null;
+                        u._uploading_chunks = null;
+                        u._chunks = null;
+                        return u.upload(true); // force reload
+                    });
+                } else {
+                    u.get_all_signatures(function() {
+                        u.load_file(file);
+                    });
+                }
+            }
+        }, force);
+    }
     Uploader.prototype.load_file = function(file) {
         var u = this;
         if(u.get_state() != "waiting") {
@@ -300,7 +234,7 @@ function mule_upload(input, settings) {
                 })
             }
 
-            var path = "/" + u.settings.key;
+            var path = "/" + u.key;
 
             // The chunk number is 0-indexed to simplify the calculations,
             // but S3 requires 1-indexed part numbers
@@ -318,7 +252,7 @@ function mule_upload(input, settings) {
 
             xhr.setRequestHeader("x-amz-date", date);
             xhr.setRequestHeader("Authorization", authorization);
-            xhr.setRequestHeader("Content-Type", u.settings.content_type);
+            xhr.setRequestHeader("Content-Type", u.file.type);
             xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
 
             xhr.send(blob);
@@ -350,7 +284,7 @@ function mule_upload(input, settings) {
 
         u.settings.on_progress.call(u, u.file.size, u.file.size); // 100% done.
         this.get_end_signature(function(signature, date) {
-            var path = "/" + u.settings.key + "?uploadId=" + u.upload_id;
+            var path = "/" + u.key + "?uploadId=" + u.upload_id;
             var method = "POST";
             var authorization = "AWS " + u.settings.access_key + ":" + signature;
 
@@ -394,7 +328,7 @@ function mule_upload(input, settings) {
 
                     } else {
                         u.cancel(function() {
-                            u.input.onchange(null, true);
+                            u.upload(true);
                         });
                     }
                 }
@@ -406,7 +340,7 @@ function mule_upload(input, settings) {
 
             xhr.setRequestHeader("x-amz-date", date);
             xhr.setRequestHeader("Authorization", authorization);
-            xhr.setRequestHeader("Content-Type", u.settings.content_type);
+            xhr.setRequestHeader("Content-Type", u.file.type);
             xhr.setRequestHeader("Content-Disposition", "attachment; filename=" + u.file.name);
 
             u.list_parts(function(parts) {
@@ -439,7 +373,7 @@ function mule_upload(input, settings) {
     Uploader.prototype.list_parts = function(callback, error_callback) {
         var u = this;
         this.get_list_signature(function(signature, date) {
-            var path = "/" + u.settings.key + "?uploadId=" + u.upload_id;
+            var path = "/" + u.key + "?uploadId=" + u.upload_id;
             var method = "GET";
             var authorization = "AWS " + u.settings.access_key + ":" + signature;
 
@@ -501,7 +435,7 @@ function mule_upload(input, settings) {
         xhr.addEventListener("load", handler, true);
         xhr.addEventListener("error", error_handler, true);
         xhr.open("GET", u.settings.ajax_base + "/get_end_signature/?upload_id=" + escape(this.upload_id)
-                + "&key=" + this.settings.key);
+                + "&key=" + this.key + "&content_type=" + escape(this.file.type));
         xhr.send();
     }
     Uploader.prototype.get_list_signature = function(callback, error_callback) {
@@ -524,7 +458,7 @@ function mule_upload(input, settings) {
         xhr.addEventListener("load", handler, true);
         xhr.addEventListener("error", error_handler, true);
         xhr.open("GET", u.settings.ajax_base + "/get_list_signature/?upload_id=" + escape(this.upload_id)
-                + "&key=" + this.settings.key);
+                + "&key=" + this.key);
         xhr.send();
     }
     Uploader.prototype.get_chunk_signature = function(chunk, callback) {
@@ -547,7 +481,7 @@ function mule_upload(input, settings) {
         xhr.addEventListener("error", error_handler, true);
         xhr.open("GET", u.settings.ajax_base + "/get_chunk_signature/?chunk="
             + (chunk + 1) + "&upload_id=" + escape(this.upload_id)
-            + "&key=" + this.settings.key);
+            + "&key=" + this.key + "&content_type=" + escape(u.file.type));
         xhr.send();
     }
     Uploader.prototype.get_init_signature = function(callback, force) {
@@ -572,7 +506,7 @@ function mule_upload(input, settings) {
                 }
                 console.log("__" + u.get_total_progress());
                 u.upload_id = response.upload_id;
-                u.settings.key = response.key;
+                u.key = response.key;
             }
             callback(response.signature, response.date);
         }
@@ -584,7 +518,7 @@ function mule_upload(input, settings) {
         }
         xhr.addEventListener("load", handler, true);
         xhr.addEventListener("error", error_handler, true);
-        xhr.open("GET", u.settings.ajax_base + "/get_init_signature/?key=" + u.settings.key
+        xhr.open("GET", u.settings.ajax_base + "/get_init_signature/?key=" + u.key
                 + "&filename=" + escape(u.file.name) + "&filesize=" + u.file.size
                 + "&last_modified=" + u.file.lastModifiedDate.valueOf() + (force ? "&force=true" : ""));
         xhr.send();
@@ -604,13 +538,13 @@ function mule_upload(input, settings) {
         }
         xhr.addEventListener("load", handler, true);
         xhr.addEventListener("error", error_handler, true);
-        xhr.open("GET", u.settings.ajax_base + "/get_delete_signature/?key=" + u.settings.key
+        xhr.open("GET", u.settings.ajax_base + "/get_delete_signature/?key=" + u.key
                 + "&upload_id=" + u.upload_id);
         xhr.send();
     }
     Uploader.prototype.get_all_signatures = function(callback) {
         var u = this;
-        var key = u.settings.key;
+        var key = u.key;
         var num_chunks = Math.ceil(u.file.size / u.settings.chunk_size);
         var upload_id = u.upload_id;
         var xhr = new XMLHttpRequest()
@@ -630,7 +564,7 @@ function mule_upload(input, settings) {
         xhr.addEventListener("load", handler, true);
         xhr.addEventListener("error", error_handler, true);
         xhr.open("GET", u.settings.ajax_base + "/get_all_signatures/?key=" + key + "&num_chunks="
-            + num_chunks + "&upload_id=" + upload_id + "&filename=" + escape(u.file.name)
+            + num_chunks + "&upload_id=" + upload_id + "&filename=" + escape(u.file.name) + "&content_type=" + escape(u.file.type)
             + "&filesize=" + u.file.size + "&last_modified=" + u.file.lastModifiedDate.valueOf());
         xhr.send()
     }
@@ -640,7 +574,7 @@ function mule_upload(input, settings) {
             return;
         }
         var xhr = new XMLHttpRequest();
-        var key = u.settings.key;
+        var key = u.key;
         var upload_id = u.upload_id;
         xhr.open("GET", u.settings.ajax_base + '/chunk_loaded/?key=' + key + "&chunk=" + (chunk + 1)
             + "&upload_id=" + upload_id + "&filename=" + escape(u.file.name)
@@ -651,7 +585,7 @@ function mule_upload(input, settings) {
         var u = this;
         var xhr = new XMLHttpRequest();
         var method = "HEAD";
-        var path = "/" + u.settings.key;
+        var path = "/" + u.key;
         var inner_handler = function(e) {
             // the handler only checks for status code;
             // if the HEAD returns 404, re-upload,
@@ -815,10 +749,10 @@ function mule_upload(input, settings) {
         return true;
     }
     Uploader.prototype.get_key = function() {
-        return this.settings.key;
+        return this.key;
     }
     Uploader.prototype.get_upload_id = function() {
         return this.upload_id;
     }
-    return new Uploader(input, settings);
+    return new Uploader(file, key, settings);
 };
