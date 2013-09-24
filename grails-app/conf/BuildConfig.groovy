@@ -1,6 +1,13 @@
 grails.project.class.dir = "target/classes"
 grails.project.test.class.dir = "target/test-classes"
 grails.project.test.reports.dir = "target/test-reports"
+grails.project.target.level = 1.6
+grails.project.source.level = 1.6
+grails.project.repos.vidergize.url = "http://nexus.vidergize.com/content/repositories/releases"
+grails.project.repos.vidergize.username = "deployment"
+grails.project.repos.vidergize.password = "v1derg1ze"
+grails.project.repos.default = "vidergize"
+grails.release.scm.enabled = false
 
 grails.project.dependency.resolution = {
 	// inherit Grails' default dependencies
