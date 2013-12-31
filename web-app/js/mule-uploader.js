@@ -35,7 +35,7 @@ function uploader(file, key, settings) {
         // NOTE: For Amazon S3, the minimum chunk size is 5MB
         settings.chunk_size = settings.chunk_size || (6 * MB); // default 6MB
         settings.bucket = settings.bucket || "akiai-raw";
-        settings.host = settings.host || "http://" + settings.bucket + ".s3.amazonaws.com";
+        settings.host = settings.host || "https://" + settings.bucket + ".s3.amazonaws.com";
         settings.access_key = settings.access_key || "YOUR AWS ACCESS KEY";
         settings.on_progress = settings.on_progress || function() {};
         settings.on_select = settings.on_select || function() {};
