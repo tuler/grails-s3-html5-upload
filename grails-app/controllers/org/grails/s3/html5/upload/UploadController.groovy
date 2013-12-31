@@ -69,6 +69,7 @@ class UploadController {
 			
 			if (!upload) {
 				// upload not found, create a brand new one
+				log.info "Upload of ${filename} not found, creating a new one for ${key}"
 				upload = new Upload(
 					filename: filename, 
 					filesize: filesize, 
@@ -84,6 +85,7 @@ class UploadController {
 			chunks.remove("")
 			upload.chunksUploaded = chunks.join(',')
 			upload.save(failOnError: true)
+			log.info "Chunk ${chunk} received for upload of ${filename} [${upload.key}]: ${upload.chunksUploaded}"
 			
 			render ''
 		}
@@ -122,6 +124,7 @@ class UploadController {
 		
 		if (upload && params.force) {
 			// if force and exists, delete it
+			log.info "Upload of ${filename} found, but forced init, so let's delete it"
 			upload.delete()
 			upload = null
 		}
@@ -129,6 +132,7 @@ class UploadController {
 		if (upload) {
 			// upload already initiated, based on [filename, filesize, lastModified]
 			// generate signature for init of uploadId
+			log.info "Upload of ${filename} found [${upload.key}], resuming"
 			def signature = init(upload.key, date)
 			render JsonOutput.toJson([
 				signature: signature, 
