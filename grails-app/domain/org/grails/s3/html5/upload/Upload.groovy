@@ -20,7 +20,7 @@ class Upload {
 	
 	static constraints = {
 		filename nullable: false, blank: false
-		filesize nullable: false, blank: false
+		filesize nullable: false
 		lastModified nullable: false, blank: false
 		key nullable: false, blank: false
 		uploadId nullable: false, blank: false
