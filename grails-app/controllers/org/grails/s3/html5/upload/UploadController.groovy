@@ -3,6 +3,7 @@ package org.grails.s3.html5.upload
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.apache.commons.codec.binary.Base64
+import org.apache.commons.io.FileUtils
 import java.text.SimpleDateFormat
 import groovy.json.JsonOutput
 
@@ -70,7 +71,7 @@ class UploadController {
 			if (!upload) {
 				// upload not found, create a brand new one
 				log.info "Upload of ${filename} not found, creating a new one for ${key}"
-				upload = new Upload(
+				upload = new Upload (
 					filename: filename, 
 					filesize: filesize, 
 					lastModified: lastModified, 
@@ -85,7 +86,10 @@ class UploadController {
 			chunks.remove("")
 			upload.chunksUploaded = chunks.join(',')
 			upload.save(failOnError: true)
-			log.info "Chunk ${chunk} received for upload of ${filename} [${upload.key}]: ${upload.chunksUploaded}"
+			
+			String userAgent = request.getHeader('User-Agent')
+			long numChunks = Math.ceil(filesize / grailsApplication.config.grails.plugin.s3.html5.upload.chunkSize);
+			log.info "Chunk #${chunk} received for upload of \"${filename}\" (${FileUtils.byteCountToDisplaySize(filesize)}) [${upload.key}]: ${chunks.size()}/${numChunks} received, User: ${request.remoteUser}, User-Agent: ${userAgent}"
 			
 			render ''
 		}
@@ -169,5 +173,33 @@ class UploadController {
 		def date = http_date()
 		def signature = delete(params.key, params.upload_id, date)
 		render JsonOutput.toJson([signature: signature, date: date])
+	}
+	
+	def list_all() {
+		def humanReadableByteCount = { long bytes, boolean si -> 
+			int unit = si ? 1000 : 1024;
+			if (bytes < unit) return bytes + " B";
+			int exp = (int) (Math.log(bytes) / Math.log(unit));
+			String pre = (si ? "kMGTPE" : "KMGTPE").charAt(exp-1).toString();
+			return String.format("%.1f %sB", bytes / Math.pow(unit, exp), pre);
+		}
+
+		return [uploads: Upload.list().collect { upload ->
+			long numChunks = Math.ceil(upload.filesize / grailsApplication.config.grails.plugin.s3.html5.upload.chunkSize);
+			Set chunksLoaded = upload.chunksUploaded.split(',') as Set
+			String status = chunksLoaded.size() == numChunks ? 'COMPLETED' : 'INCOMPLETE'
+			return [
+				id: upload.id, 
+				key: upload.key, 
+				numChunksLoaded: chunksLoaded.size(), 
+				numChunks: numChunks, 
+				status: status, 
+				filename: upload.filename, 
+				filesize: upload.filesize, 
+				humanReadableFilesize: humanReadableByteCount(upload.filesize, false), 
+				dateCreated: upload.dateCreated, 
+				lastUpdated: upload.lastUpdated
+			]
+		}]
 	}
 }
